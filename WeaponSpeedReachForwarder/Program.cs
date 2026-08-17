@@ -22,9 +22,6 @@ public static class Program
     {
         var weaponMods = _settings.Value.WeaponModPlugin.ToHashSet();
 
-        if (weaponMods.Count == 0)
-            return;
-
         foreach (var weaponMod in weaponMods)
         {
             var index = state.LoadOrder.IndexOf(weaponMod);
@@ -33,7 +30,7 @@ public static class Program
                 throw new Exception($"{weaponMod} isn't loaded");
         }
 
-        var weapons = new Dictionary<FormKey, IWeaponGetter>();
+        var selectedWeapons = new Dictionary<FormKey, IWeaponGetter>();
 
         foreach (var mod in state.LoadOrder.ListedOrder)
         {
@@ -41,7 +38,7 @@ public static class Program
                 continue;
 
             foreach (var weapon in mod.Mod.EnumerateMajorRecords<IWeaponGetter>())
-                weapons[weapon.FormKey] = weapon;
+                selectedWeapons[weapon.FormKey] = weapon;
         }
 
         var winners = state.LoadOrder.PriorityOrder
@@ -49,9 +46,86 @@ public static class Program
             .WinningOverrides()
             .ToDictionary(x => x.FormKey);
 
-        var patched = 0;
+        if (_settings.Value.UseReqtificatorSettings)
+        {
+            var origins = new Dictionary<FormKey, IWeaponGetter>();
 
-        foreach (var (formKey, source) in weapons)
+            foreach (var mod in state.LoadOrder.ListedOrder)
+            {
+                if (!mod.Enabled || mod.Mod is null)
+                    continue;
+
+                foreach (var weapon in mod.Mod.EnumerateMajorRecords<IWeaponGetter>())
+                    if (weapon.FormKey.ModKey == mod.ModKey)
+                        origins[weapon.FormKey] = weapon;
+            }
+
+            var patched = 0;
+
+            foreach (var (formKey, winner) in winners)
+            {
+                if (winner.Data is null)
+                    continue;
+
+                float speed;
+                float reach;
+
+                if (selectedWeapons.TryGetValue(formKey, out var selected) && selected.Data is not null)
+                {
+                    speed = selected.Data.Speed;
+                    reach = selected.Data.Reach;
+                }
+                else
+                {
+                    if (!origins.TryGetValue(formKey, out var origin) || origin.Data is null)
+                        continue;
+
+                    speed = origin.Data.Speed;
+                    reach = origin.Data.Reach;
+
+                    switch (origin.Data.AnimationType)
+                    {
+                        case WeaponAnimationType.HandToHand:
+                        case WeaponAnimationType.OneHandSword:
+                        case WeaponAnimationType.OneHandDagger:
+                        case WeaponAnimationType.OneHandAxe:
+                        case WeaponAnimationType.OneHandMace:
+                        case WeaponAnimationType.TwoHandSword:
+                        case WeaponAnimationType.TwoHandAxe:
+                            reach *= 0.7f;
+                            break;
+                        case WeaponAnimationType.Bow:
+                            speed = 0.3704f;
+                            break;
+                        case WeaponAnimationType.Crossbow:
+                            speed = 0.4445f;
+                            break;
+                    }
+                }
+
+                if (winner.Data.Speed == speed && winner.Data.Reach == reach)
+                    continue;
+
+                var weapon = state.PatchMod.Weapons.GetOrAddAsOverride(winner);
+
+                if (weapon.Data is null)
+                    continue;
+
+                weapon.Data.Speed = speed;
+                weapon.Data.Reach = reach;
+                patched++;
+            }
+
+            Console.WriteLine($"Patched {patched} weapon speed/reach records");
+            return;
+        }
+
+        if (selectedWeapons.Count == 0)
+            return;
+
+        var patchedDirect = 0;
+
+        foreach (var (formKey, source) in selectedWeapons)
         {
             if (source.Data is null || !winners.TryGetValue(formKey, out var winner))
                 continue;
@@ -66,9 +140,9 @@ public static class Program
 
             weapon.Data.Speed = source.Data.Speed;
             weapon.Data.Reach = source.Data.Reach;
-            patched++;
+            patchedDirect++;
         }
 
-        Console.WriteLine($"Patched {patched} weapon speed/reach records");
+        Console.WriteLine($"Patched {patchedDirect} weapon speed/reach records");
     }
 }
