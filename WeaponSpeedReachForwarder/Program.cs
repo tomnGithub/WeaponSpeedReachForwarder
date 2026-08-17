@@ -25,6 +25,14 @@ public static class Program
         if (weaponMods.Count == 0)
             return;
 
+        foreach (var weaponMod in weaponMods)
+        {
+            var index = state.LoadOrder.IndexOf(weaponMod);
+
+            if (index < 0 || !state.LoadOrder[index].Enabled || state.LoadOrder[index].Mod is null)
+                throw new Exception($"{weaponMod} isn't loaded");
+        }
+
         var weapons = new Dictionary<FormKey, IWeaponGetter>();
 
         foreach (var mod in state.LoadOrder.ListedOrder)
@@ -36,17 +44,9 @@ public static class Program
                 weapons[weapon.FormKey] = weapon;
         }
 
-        foreach (var weaponMod in weaponMods)
-            if (!state.LoadOrder.Any(x => x.ModKey == weaponMod && x.Enabled && x.Mod is not null))
-                throw new Exception($"{weaponMod} isn't loaded");
-
         var winners = state.LoadOrder.PriorityOrder
             .Weapon()
-            .WinningContextOverrides(state.LinkCache)
-            .ToDictionary(x => x.Record.FormKey);
-
-        var patchWeapons = state.PatchMod
-            .EnumerateMajorRecords<IWeaponGetter>()
+            .WinningOverrides()
             .ToDictionary(x => x.FormKey);
 
         var patched = 0;
@@ -56,22 +56,16 @@ public static class Program
             if (source.Data is null || !winners.TryGetValue(formKey, out var winner))
                 continue;
 
-            var current = patchWeapons.TryGetValue(formKey, out var patchWeapon)
-                ? patchWeapon
-                : winner.Record;
-
-            if (current.Data is null ||
-                current.Data.Speed == source.Data.Speed && current.Data.Reach == source.Data.Reach)
-                continue;
-
-            var weapon = winner.GetOrAddAsOverride(state.PatchMod);
+            var weapon = state.PatchMod.Weapons.GetOrAddAsOverride(winner);
 
             if (weapon.Data is null)
                 continue;
 
+            if (weapon.Data.Speed == source.Data.Speed && weapon.Data.Reach == source.Data.Reach)
+                continue;
+
             weapon.Data.Speed = source.Data.Speed;
             weapon.Data.Reach = source.Data.Reach;
-            patchWeapons[formKey] = weapon;
             patched++;
         }
 
