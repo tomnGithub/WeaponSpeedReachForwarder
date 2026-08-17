@@ -64,7 +64,7 @@ public static class Program
 
             foreach (var (formKey, winner) in winners)
             {
-                if (winner.Data is null)
+                if (winner.Data is null || winner.Data.AnimationType == WeaponAnimationType.Bow || winner.Data.AnimationType == WeaponAnimationType.Crossbow)
                     continue;
 
                 float speed;
@@ -94,12 +94,6 @@ public static class Program
                         case WeaponAnimationType.TwoHandAxe:
                             reach *= 0.7f;
                             break;
-                        case WeaponAnimationType.Bow:
-                            speed = 0.3704f;
-                            break;
-                        case WeaponAnimationType.Crossbow:
-                            speed = 0.4445f;
-                            break;
                     }
                 }
 
@@ -127,7 +121,7 @@ public static class Program
 
         foreach (var (formKey, source) in selectedWeapons)
         {
-            if (source.Data is null || !winners.TryGetValue(formKey, out var winner))
+            if (source.Data is null || source.Data.AnimationType == WeaponAnimationType.Bow || source.Data.AnimationType == WeaponAnimationType.Crossbow || !winners.TryGetValue(formKey, out var winner))
                 continue;
 
             var weapon = state.PatchMod.Weapons.GetOrAddAsOverride(winner);
