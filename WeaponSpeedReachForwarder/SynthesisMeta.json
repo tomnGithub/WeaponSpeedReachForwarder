@@ -1,0 +1,13 @@
+{
+  "Nickname": "WeaponSpeedReachForwarder",
+  "Visibility": "Visible",
+  "OneLineDescription": "Forwards weapon Speed and Reach from selected mod.",
+  "LongDescription": "Forwards weapon Speed and Reach from selected mod..",
+  "PreferredAutoVersioning": "Default",
+  "RequiredMods": [],
+  "TargetedReleases": [
+    "SkyrimSE",
+    "SkyrimVR",
+    "SkyrimSEGog"
+  ]
+}
